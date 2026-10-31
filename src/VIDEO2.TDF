@@ -87,6 +87,7 @@ VARIABLE
 	CTH[5..0]	: DFFE;
 	CTV[8..0]	: DFFE;
 	CTF[6..0]	: DFF;
+	PIX_ENA		: DFF;
 
 	VXA[19..0]	: DFFE;
 
@@ -102,13 +103,21 @@ VARIABLE
 	BORD		: NODE;
 --	INTT_T		: NODE;
 	INTTX		: NODE;
+	INTTX_N_DELAY	: DFF;
 
 	VLA[17..0]	: DFF;
---	SVA[17..0]	: NODE;
+	VLA_NEXT[17..0]	: NODE;
+	VLA_MUX[10..0]	: LCELL;
+	VLA_HOLD[10..0]	: LCELL;
 	SVA[17..0]	: DFF;
---	RSVA[8..0]	: LCELL;
-	RSVA[8..0]	: NODE;
---	RSVA[8..0]	: DFF;
+	SOURCE_X[9..0]	: NODE;
+	SOURCE_Y[7..0]	: NODE;
+	GRID_X[8..0]	: DFFE;
+	GRID_Y[8..0]	: DFF;
+	SHIFT_X[3..0]	: DFFE;
+	SHIFT_Y[3..0]	: DFFE;
+	SHIFT_CLK0	: DFF;
+	SHIFT_CLK	: DFF;
 
 	V_CST[1..0]	: DFF;
 	VCM[2..0]	: DFF;
@@ -165,17 +174,13 @@ VARIABLE
 	MODE0[7..0]		: DFFE;
 	MODE1[7..0]		: DFFE;
 	MODE2[7..0]		: DFFE;
---	MODE3[7..0]		: DFF;
+	MODE3[7..0]		: DFFE;
 
 	WR_MODE		: DFF;
 	LWR_MODE	: NODE;
 	X_MODE[7..4]: NODE;
 	X_MODE_BOND	: NODE;
 
---	M_CTV[2..0]	: DFF;
---	M_CT[5..3]  : DFF;
-	M_CTV[2..0]	: LCELL;
-	M_CT[5..3]  : LCELL;
 
 	DOUBLE		: DFFE;
 
@@ -294,7 +299,9 @@ BEGIN
 	END CASE;
 								  -- for remove sinc jitter
 --	CT[5..3].ena	= DFF(((CT0 & CT2) or (COPY_SINC_H & !CT4)),CLK42,,);
-	CT[5..3].ena	= DFF((CT0 & CT2),CLK42,,);
+	PIX_ENA.clk	= CLK42;
+	PIX_ENA.d	= CT0 & CT2;
+	CT[5..3].ena	= PIX_ENA;
 	CT[5..3]		= CT[5..3]+1;
 %
 	CASE CT[4..3] IS
@@ -391,7 +398,10 @@ IF MODE == "SPRINTER" GENERATE
 	BLANK	= DFF(((BORD & MODE03 & MODE02) or DIR_PORT4),LWR_COL,,);
 	INTTX 	= DFF((BORD & MODE03 & MODE02 & MODE00),LWR_COL,,);
 
-	INTT	= DFF(!(INTTX & (CTV[2..0] == 7)),CT5,,);
+	-- Sampled falling edge of the tile interrupt marker.
+	INTTX_N_DELAY.clk = CT5;
+	INTTX_N_DELAY.d = !INTTX;
+	INTT	= DFF((INTTX_N_DELAY or INTTX),CT5,,);
 
 --	INTT	= DFF((INTTX or DFF(INTTX,CT5,,)),CT5,,);
 --	INTT	= DFF(!(BLANK & (CTV[2..0] == 7)),CLK42,,MODE0[0]);
@@ -407,7 +417,7 @@ IF MODE == "SPRINTER" GENERATE
 
 	CASE VCM[1..0] IS
 		WHEN 0 =>
-			VLA[].d	= (BRVA[7..0],VCC,VCC,VCC,VCC,VCC,RBRVA[10..8],GND,GND);
+			VLA_NEXT[]	= (BRVA[7..0],VCC,VCC,VCC,VCC,VCC,RBRVA[10..8],GND,GND);
 			V_CST[].d = (VCC,GND);
 			V_WE.d		= VCC;
 			V_WEX.d		= VCC;
@@ -422,20 +432,20 @@ IF MODE == "SPRINTER" GENERATE
 		WHEN 1 =>
 			WR_PIC.d	= !VCM2;
 			WR_COL.d	= VCM2;
-			VLA[].d		= SVA[];
+			VLA_NEXT[]		= SVA[];
 			V_CST[].d = (VCC,GND);
 			V_WE.d		= VCC;
 			V_WEX.d		= VCC;
 		WHEN 2 =>
-			VLA[].d		= VXA[17..0];
+			VLA_NEXT[]		= VXA[17..0];
 			V_CST[].d 	= (!VXA18,VXA18) or MXWE;
 			V_WE.d		= MXWE;
 			V_WEX.d		= GND;
 			V_WET[].d	= MXWE or !((!VXA1 & !VXA0),(!VXA1 & VXA0),(VXA1 & !VXA0),(VXA1 & VXA0));
 		WHEN 3 =>
 			WR_PIC.d	= X_MODE5;
-			VLA[].d		= (DIR_PORT3,CTH[5..0],CT5,VCC,VCC,CTV[8..3],GND,GND);
-			WR_MODE.d	= !(CT[5..3] == B"111") & !(CT4 & CT3 & !MODE0[5]);
+			VLA_NEXT[]		= (DIR_PORT3,GRID_X[8..2],VCC,VCC,GRID_Y[8..3],GND,GND);
+			WR_MODE.d	= !(GRID_X[2..0] == B"111") & !(GRID_X1 & GRID_X0 & !MODE0[5]);
 			V_CST[].d 	= (VCC,GND);
 			V_WE.d		= VCC;
 			V_WEX.d		= VCC;
@@ -459,46 +469,33 @@ IF MODE == "SPRINTER" GENERATE
 
 --	=====================
 
-	SVA[].clk	= CLK42;
-	SVA[9..6]	= MODE0[3..0];
---	RSVA[].clk	= CLK42;
-	(SVA[12..10],SVA[5..0]) = RSVA[];
+	-- SCROLL descriptor: X=(MODE0[1..0],MODE1[]), Y=MODE2[].
+	-- MODE02 commits the MODE3 fine offsets on SHIFT_CLK.
+	(SHIFT_CLK0.clk,SHIFT_CLK.clk) = CLK42;
+	SHIFT_CLK0.d = !((VCM[1..0] == 3) & (CT[5..3] == 7));
+	SHIFT_CLK.d = SHIFT_CLK0;
+	(SHIFT_X[].clk,SHIFT_Y[].clk) = SHIFT_CLK;
+	(SHIFT_X[].ena,SHIFT_Y[].ena) = MODE02;
+	(SHIFT_Y[],SHIFT_X[]) = MODE3[];
 
---	M_CTV[2..0].clk	= CLK42;
---	M_CT[5..3].clk	= CLK42;
-	M_CTV[2..0]	= (!MODE2[2] & CTV[2..0]) or MODE2[2] & (MODE2[1],CTV[2..1]);
-	M_CT[5..3]	= (!MODE2[2] & (CT[5],!CT[4..3])) or MODE2[2] & (MODE2[0],!CT[5..4]);
+	-- Pixel grid; low X advances on PIX_ENA, upper X and Y every CLK42.
+	(GRID_X[].clk,GRID_Y[].clk) = CLK42;
+	GRID_X[2..0].ena = PIX_ENA;
+	GRID_X[8..3].ena = VCC;
+	GRID_X[] = (CTH[5..0],CT[5..3]) + (B"00000",SHIFT_X[]);
+	GRID_Y[] = CTV[] + (B"00000",SHIFT_Y[]);
 
-	CASE (!VCM2,MODE0[4]) IS
---	CASE (!VCM1,MODE0[4]) IS
-		WHEN B"X0" =>
-			--	Graf adress  --
-			RSVA[] = (M_CTV[2..0],MODE1[2..0],M_CT[5..3]);
-			SVA[17..13] = MODE1[7..3];
-
---			SVA[12..10] = CTV[2..0];
---			SVA[5..0]	= (MODE1[2..0],CT5,!CT[4..3]);
-		WHEN B"01" =>
-			--	ZX-atr adress  --
-			RSVA[] = (MODE2[2..0],SCR128,VCC,VCC,GND,!MODE0[7..6]);
-			SVA[17..13] = MODE2[7..3];
-
---			SVA[12..10] = MODE2[2..0];
---			SVA[5..0]	= (SCR128,VCC,VCC,GND,!MODE0[7..6]);
-		WHEN B"11" =>
-			--	ZX-pic adress  --
-			RSVA[] = (MODE1[2..0],SCR128,MODE0[7..6],CTV2,!CTV1,!CTV0);
-			SVA[17..13] = MODE1[7..3];
-
---			SVA[12..10] = MODE1[2..0];
---			SVA[5..0]	= (SCR128,MODE0[7..6],CTV2,!CTV1,!CTV0);
-	END CASE;
+	-- Source coordinates: byte X and line Y, with registered fine offsets.
+	SOURCE_X[] = (MODE0[1..0],MODE1[]) + (B"0000000",GRID_X[2..0]);
+	SOURCE_Y[] = MODE2[] + (B"00000",GRID_Y[2..0]);
+	SVA[].clk = CLK42;
+	SVA[] = (SOURCE_Y[],SOURCE_X[9..2],!SOURCE_X[1..0]);
 
 --	X_MODE_BOND	= LCELL(LCELL(DCOL[7..4] == 15) & LCELL(DCOL[3..0] == 15) & DFF((MODE0[7] & MODE0[5] & !MODE0[4]),LWR_COL,VCC,VCC));
 	X_MODE_BOND	= GND;
 
 --	LD_PIC	= LCELL((MODE0[5] & DFF((CT[5..3] == B"000"),CLK42,,)) or (!MODE0[5] & DFF((CT[4..2] == B"000"),CLK42,,)));
-	LD_PIC	= LCELL((MODE0[5] & DFF((CT[5..3] == B"000"),CLK42,,)) or (!MODE0[5] & DFF((CT[4..2] == B"000"),CLK42,,)));
+	LD_PIC	= LCELL((MODE0[5] & DFF((GRID_X[2..0] == 0),CLK42,,)) or (!MODE0[5] & DFF(((GRID_X[1..0] == 0) & !CT2),CLK42,,)));
 
 --	CASE (DFF(VLA1,!CLK42,,),DFF(VLA0,!CLK42,,)) IS
 
@@ -530,12 +527,15 @@ IF MODE == "SPRINTER" GENERATE
 	MODE0[].ena 	= VCC;
 	MODE1[].ena 	= VCC;
 	MODE2[].ena 	= VCC;
+	MODE3[].ena 	= VCC;
 	MODE0[].clk		= LWR_MODE;
 	MODE1[].clk		= LWR_MODE;
 	MODE2[].clk		= LWR_MODE;
+	MODE3[].clk		= LWR_MODE;
 	MODE0[].d		= VDM3[];
 	MODE1[].d		= VDM2[];
 	MODE2[].d		= VDM1[];
+	MODE3[].d		= VDM0[];
 	LWR_MODE		= LCELL(LCELL(WR_MODE));
 %
 	MODE0[].ena 	= LWR_MODE;
@@ -553,6 +553,14 @@ IF MODE == "SPRINTER" GENERATE
 	X_MODE6	= DFF(MODE0[6],LWR_COL,,);
 	X_MODE5	= DFF(MODE0[5],LWR_COL,,);
 	X_MODE4 = DFF(MODE0[4],LWR_COL,,);
+
+	-- Address input cells: VAO[15..8] and VAO[2..0].
+	VLA_MUX[] = (VLA_NEXT[17..10],VLA_NEXT[4..2]);
+	VLA_HOLD[] = VLA_MUX[];
+	(VLA[17..10].d,VLA[4..2].d) = VLA_HOLD[];
+
+	VLA[9..5].d = VLA_NEXT[9..5];
+	VLA[1..0].d = VLA_NEXT[1..0];
 
 	VAO[]	= VLA[17..2];
 
@@ -583,7 +591,8 @@ IF MODE == "SPRINTER" GENERATE
 	DCOL[].ena	= !LWR_COL;
 	DCOL[].clk	= CLK42;
 
-	IF DFF((MODE0[7..4] == 15),WR_PIC,,) THEN
+	-- Use the same LWR_COL border epoch as the reference DCOL mux.
+	IF BORD THEN
 		DCOL[].d	= (B"00",BRD[2..0],BRD[2..0]);
 	ELSE
 --		DCOL[].d	= D_PIC0_[];

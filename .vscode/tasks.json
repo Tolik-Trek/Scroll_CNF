@@ -1,0 +1,68 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Compile Scroll.tdf",
+			"detail": "net_list → Build\\scroll → Build\\scroll.acx; ресурсы ACEX и fmax из отчёта MAX+PLUS II.",
+			"type": "process",
+			"command": "powershell.exe",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"args": [
+				"-NoLogo",
+				"-NoProfile",
+				"-NonInteractive",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}\\mp2build.ps1"
+			],
+			"problemMatcher": [],
+			"group": "build",
+			"isBackground": false,
+			"runOptions": {
+				"instanceLimit": 1
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"revealProblems": "onProblem",
+				"focus": true,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": true
+			}
+		},
+		{
+			"label": "Compile SCROLL (src)",
+			"detail": "src → изолированная компиляция и review → Build\\SCSRC\\SCROLL.ACX; ресурсы ACEX и fmax.",
+			"type": "process",
+			"command": "C:\\Python312\\python.exe",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"args": [
+				"-X",
+				"utf8",
+				"-B",
+				"${workspaceFolder}\\bin\\build_src.py"
+			],
+			"problemMatcher": [],
+			"group": "build",
+			"isBackground": false,
+			"runOptions": {
+				"instanceLimit": 1
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"revealProblems": "onProblem",
+				"focus": true,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": true
+			}
+		}
+	]
+}

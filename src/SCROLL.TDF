@@ -1,3 +1,4 @@
+-- SCROLL
 
 	TITLE "Main";
 
@@ -11,15 +12,11 @@ PARAMETERS
 
 INCLUDE "lpm_ram_dp";
 INCLUDE "kbd";
-INCLUDE "video";
 INCLUDE "video2";
 
 INCLUDE	"dcp";
-INCLUDE	"dcp2";
 
 INCLUDE "acceler";
-INCLUDE "ay";
-INCLUDE "mouse";
 
 SUBDESIGN SCROLL
 	(
@@ -33,7 +30,6 @@ SUBDESIGN SCROLL
 	/IO			: INPUT;
 	/WR			: INPUT;
 	/RD			: INPUT;
-	/HALT		: INPUT;
 	/MR			: INPUT;
 	A[15..0]	: INPUT;
 	D[7..0]		: BIDIR;
@@ -63,7 +59,8 @@ SUBDESIGN SCROLL
 	/WE			: OUTPUT;
 
 	XACS		: OUTPUT;	-- ROM_WE
-	XA[3..0]	: BIDIR;
+	XA[2..0]	: BIDIR;
+	XA3		: INPUT;
 	SXA			: OUTPUT;
 
 	RDXA		: OUTPUT;
@@ -76,7 +73,6 @@ SUBDESIGN SCROLL
 	)
 VARIABLE
 
-	MS			: MOUSE;
 	KEYS		: KBD;
 	SVIDEO		: VIDEO2 WITH (MODE=MODE);
 
@@ -84,7 +80,6 @@ VARIABLE
 --	DECODE		: DCP2;
 
 	ACC			: ACCELER;
-	AY3			: AY;
 
 	CBL			: lpm_ram_dp WITH (lpm_width=16,lpm_widthad=8);
 
@@ -130,7 +125,7 @@ VARIABLE
 	KBD_CC		: NODE;	-- from XA0 / SXA=0 / RD_XA=0
 	KBD_DD		: NODE;	-- from XA1 / SXA=0 / RD_XA=0
 	TAPE_IN		: NODE; -- from XA2 / SXA=0 / RD_XA=0
-	MOUSE_D		: NODE; -- from XA3 / SXA=0 / RD_XA=0
+
 
 	FDD_CH		: NODE; -- from XA0 / SXA=1 / RD_XA=0
 	FDD_W		: NODE; -- from XA1 / SXA=1 / RD_XA=0
@@ -245,7 +240,7 @@ VARIABLE
 	SOFT_RESET	: NODE;
 	SOFT_RES[1..0]	: DFF;
 
-	AY_FULL[10..0]	: DFF;
+
 
 	ALL_MODE[7..0]	: DFFE;
 
@@ -389,7 +384,7 @@ BEGIN
 			AY/PORTS[] = DECODE.DO[];
 		WHEN 1 =>
 			KEY/KEMS[] = KEMPS[];
-			AY/PORTS[] = AY3.DO[];
+			AY/PORTS[] = H"FF";
 	END CASE;
 
 	CASE DECODE.TYPE[2..1] IS
@@ -780,12 +775,10 @@ END GENERATE;
 	XA0			= TRI(KBD_CX,WR_TM9);
 	XA1			= TRI(KBD_DX,WR_TM9);
 	XA2			= TRI(TAPE_OUT,WR_TM9);
-	XA3			= TRI(GND,GND);
 
 	KBD_DD		= DFFE(XA1,T_RDXA,,,!SXA);
 	KBD_CC		= DFFE(XA0,T_RDXA,,,!SXA);
 	TAPE_IN		= DFFE(XA2,T_RDXA,,,!SXA);
-	MOUSE_D     = DFFE(XA3,T_RDXA,,,!SXA);
 
 	FDD_CH		= DFFE(XA1,T_RDXA,,,SXA);
 	FDD_W	    = DFFE(XA0,T_RDXA,,,SXA);
@@ -1006,24 +999,19 @@ END GENERATE;
 --	ZX_COLOR[3..0]
 
 	SVIDEO.ZX_PORT[5..0]	= (ACC.G_LINE[5..0]);
-	SVIDEO.ZX_PORT[7..6]	= (DECODE.SP_SA,LCELL(DECODE.SP_SCR & !(A13 & !ACC.G_LINE7) & !ACC.G_LINE6));
+	SVIDEO.ZX_PORT[7..6]	= (DECODE.SP_SA,LCELL(DECODE.SP_SCR & !(A13 & !ACC.G_LINE7) & !ACC.G_LINE6 & ALL_MODE3));
 
 	SVIDEO.DIR_PORT[0]		= DECODE.SCR128;
 
 	SVIDEO.DIR_PORT[3]		= RGMOD0;
 
-	IF (SCREEN_OFF == "USE") GENERATE
-		SVIDEO.DIR_PORT[4]		= RGMOD1;	-- 1 screen off, 0 - screen on
-	ELSE GENERATE
-		SVIDEO.DIR_PORT[4]		= GND;		-- 1 screen off, 0 - screen on
-	END GENERATE;
+	SVIDEO.DIR_PORT[4]		= RGMOD2; -- SCROLL C5/CD bit 2: palette-index blank
 
 	SVIDEO.DIR_PORT[2..1]	= GND;
 	SVIDEO.DIR_PORT[7..5]	= BORDER[2..0];
 --	SVIDEO.DIR_PORT[7..5]	= MS.OUT_X[7..5];
 
-	SVIDEO.MOUSE_X[]		= MS.OUT_X[];
-	SVIDEO.MOUSE_Y[]		= MS.OUT_Y[];
+	(SVIDEO.MOUSE_X[],SVIDEO.MOUSE_Y[]) = GND;
 
 %
 	bit0	- Spectrum SCREEN Switch
@@ -1165,53 +1153,12 @@ END GENERATE;
 		WHEN 1 => CBL_R[] = CBL.q[];
 	END CASE;
 
---	====== AY-3-8910 ========
+--	====== PCM ========
 
-	AY3.CLK42		= CLK42;
-
-	AY3./RESET		= /RESET;
-	AY3.AY_T[8..0]	= (CTH[2..0],CT[5..0]);
-
-	AY3.AY_D_WR		= DFF((DECODE./IOM or /WR) or !DFF((DCPP[] == H"91"),CLK42,,),CLK42,,);
-	AY3.AY_A_WR		= DFF((DECODE./IOM or /WR) or !DFF((DCPP[] == H"90"),CLK42,,),CLK42,,);
-
-	AY3.D[7..0]		= D[];
-	AY3.BEEPER		= BORDER4;
-
---	AY3.DO[7..0]		: OUTPUT;
-
---	AY3.AY_CH_A[3..0]	: OUTPUT;
---	AY3.AY_CH_B[3..0]	: OUTPUT;
---	AY3.AY_CH_C[3..0]	: OUTPUT;
-
-	AY_FULL[].clk = CLK42;
-
---	AY_CHS[].clk	= !CTH0;
 	AY_CHS[].clk	= !DFF((CTH1 & (CTH0 or !CT5)),CLK42,,);
 	AY_CHS[].ena	= VCC;
+	AY_CHS[].d	= (VCC,CBL_R[15..1]);
 
---	AY_FULL[] = (GND,AY_CH_L[]) + (GND,AY_CH_R[]);
-
-	CASE DFF(CTH0,CLK42,,) IS
-		WHEN 0 => AY_FULL[] = (AY3.AY_CH_L[],GND);
-		WHEN 1 => AY_FULL[] = (AY3.AY_CH_R[],GND);
-	END CASE;
-
---	AY_CHS[].d		= (((GND,AY_FULL[]) + (VCC,CBL.q[15..5])),B"0000");
-
---	AY_CHS[].d		= (((GND,AY_FULL[]) + (VCC,CBL.q[15..8],B"000")),B"0000");
-	AY_CHS[].d		= (((GND,AY_FULL[]) + (VCC,CBL_R[15..5])),CBL_R[4..1]);
-
---	===== MOUSE =========================
-
-	MS.clk		= DFF(CTH5,CLK42,,);
-	MS.mouse_d	= MOUSE_D;
-
-	CASE (A10,A8) IS
-		WHEN 0,2 => KEMPS[] = (B"111111",!MS.OUT_K0,!MS.OUT_K1);
-		WHEN 1 => 	KEMPS[] = (MS.OUT_X[7..0]);
-		WHEN 3 => 	KEMPS[] = !(MS.OUT_Y[7..0]);
-	END CASE;
+	KEMPS[] = H"FF";
 
 END;
-

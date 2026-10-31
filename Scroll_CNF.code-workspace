@@ -1,0 +1,10 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"ahdl.projectFile": "src\\SCROLL.TDF"
+	}
+}

@@ -1,0 +1,12 @@
+-- KBD
+FUNCTION kbd
+(
+	CLK42, CLK_K, KBD_CC, KBD_DD,
+	/RF, /IO, /IOM, /M1,
+	A[15..8], ENA, INT_ENA
+)
+RETURNS
+(
+	KBO[7..0],
+	KB_RESET, KB_F12, KB_CTRL, KB_ALT, KB_SH, INT
+);

@@ -1,0 +1,17 @@
+-- ACCELER
+FUNCTION acceler
+(
+	CLK42, /RESET, CT[2..0],
+	RAS, CAS, CLK_Z80,
+	MC_END, MC_BEGIN, MC_TYPE, MC_WRITE,
+	AI[15..0], DI[7..0],
+	/IO, /RD, /WR, /MR, /RF, /M1,
+	/IOM, DCP[7..0], MDI[15..0],
+	ACC_ENA, HDDR[7..0], HDD_FLIP
+)
+RETURNS
+(
+	CONTINUE, AO[15..0], DO[7..0],
+	MDO[15..0], MD[7..0],
+	G_LINE[7..0], GLISSER, ACC_ON, DOUBLE_CAS, ACC_DIR[7..0]
+);
