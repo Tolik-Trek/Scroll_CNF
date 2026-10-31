@@ -19,7 +19,7 @@
 --  their respective licensors.  No other licenses, including any licenses
 --  needed under any third party's intellectual property, are provided herein.
 --
-CHIP sp2_1k30
+CHIP SCROLL
 BEGIN
 	|CASXE1 :	LOCATION = LC8_B36;
 	|CASXE0 :	LOCATION = LC7_B36;
