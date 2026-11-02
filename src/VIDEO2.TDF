@@ -103,7 +103,7 @@ VARIABLE
 	BORD		: NODE;
 --	INTT_T		: NODE;
 	INTTX		: NODE;
-	INTTX_N_DELAY	: DFF;
+	INTTX_N_DELAY	: NODE;
 
 	VLA[17..0]	: DFF;
 	VLA_NEXT[17..0]	: NODE;
@@ -116,8 +116,8 @@ VARIABLE
 	GRID_Y[8..0]	: DFF;
 	SHIFT_X[3..0]	: DFFE;
 	SHIFT_Y[3..0]	: DFFE;
-	SHIFT_CLK0	: DFF;
-	SHIFT_CLK	: DFF;
+	SHIFT_CLK0	: NODE;
+	SHIFT_CLK	: NODE;
 
 	V_CST[1..0]	: DFF;
 	VCM[2..0]	: DFF;
@@ -399,8 +399,7 @@ IF MODE == "SPRINTER" GENERATE
 	INTTX 	= DFF((BORD & MODE03 & MODE02 & MODE00),LWR_COL,,);
 
 	-- Sampled falling edge of the tile interrupt marker.
-	INTTX_N_DELAY.clk = CT5;
-	INTTX_N_DELAY.d = !INTTX;
+	INTTX_N_DELAY	= DFF(!INTTX,CT5,,);
 	INTT	= DFF((INTTX_N_DELAY or INTTX),CT5,,);
 
 --	INTT	= DFF((INTTX or DFF(INTTX,CT5,,)),CT5,,);
@@ -471,9 +470,8 @@ IF MODE == "SPRINTER" GENERATE
 
 	-- SCROLL descriptor: X=(MODE0[1..0],MODE1[]), Y=MODE2[].
 	-- MODE02 commits the MODE3 fine offsets on SHIFT_CLK.
-	(SHIFT_CLK0.clk,SHIFT_CLK.clk) = CLK42;
-	SHIFT_CLK0.d = !((VCM[1..0] == 3) & (CT[5..3] == 7));
-	SHIFT_CLK.d = SHIFT_CLK0;
+	SHIFT_CLK0	= DFF(!((VCM[1..0] == 3) & (CT[5..3] == 7)),CLK42,,);
+	SHIFT_CLK	= DFF(SHIFT_CLK0,CLK42,,);
 	(SHIFT_X[].clk,SHIFT_Y[].clk) = SHIFT_CLK;
 	(SHIFT_X[].ena,SHIFT_Y[].ena) = MODE02;
 	(SHIFT_Y[],SHIFT_X[]) = MODE3[];
