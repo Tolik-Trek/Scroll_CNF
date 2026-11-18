@@ -196,17 +196,10 @@ BEGIN
 
 --  == accelerator grafic line ==
 
-	-- Prefix incrementers; keep the reference FF/carry boundary.
-	AA_INC0 = !AA0;
-	FOR i IN 1 TO 15 GENERATE
-		AA_INC[i] = AA[i] xor (AA[i-1..0] == !0);
-	END GENERATE;
-	AGR_INC0 = !AGR0;
-	FOR i IN 1 TO 7 GENERATE
-		AGR_INC[i] = AGR[i] xor (AGR[i-1..0] == !0);
-	END GENERATE;
+	AA_INC[] = AA[] + 1;
+	AGR_INC[] = AGR[] + 1;
 	AA_LOAD = DFF(START_ACC,CLK42,,);
-	AA_LOAD15 = LCELL(AA_LOAD);
+	AA_LOAD15 = AA_LOAD;
 
 	AGR[].clk	= CLK42;
 	AGR[].ena	= !DFF((/IOM or /WR or !DFF((DCP[] == B"1100X100"),CLK42,,)),CLK42,,) or

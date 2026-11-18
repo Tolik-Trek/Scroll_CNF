@@ -31,6 +31,7 @@ SUBDESIGN SCROLL
 	/WR			: INPUT;
 	/RD			: INPUT;
 	/MR			: INPUT;
+	/HALT : INPUT; -- авторский вход p182
 	A[15..0]	: INPUT;
 	D[7..0]		: BIDIR;
 
